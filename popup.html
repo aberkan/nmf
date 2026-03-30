@@ -8,14 +8,50 @@
   </head>
   <body>
     <main>
-      <h1>Facebook time</h1>
-      <p class="muted">Rolling windows (Phase 2 tracking)</p>
-      <dl>
-        <dt>Last 7 days</dt>
-        <dd id="week-usage">—</dd>
-        <dt>Last 24 hours</dt>
-        <dd id="day-usage">—</dd>
-      </dl>
+      <header class="header">
+        <h1 class="title">Facebook time</h1>
+        <p class="subtitle">Rolling windows</p>
+      </header>
+
+      <section class="stat stat--primary" aria-labelledby="week-label">
+        <p id="week-label" class="stat__label">Last 7 days</p>
+        <p
+          class="stat__value"
+          id="week-usage"
+          aria-live="polite"
+        >
+          —
+        </p>
+      </section>
+
+      <section class="stat" aria-labelledby="day-label">
+        <p id="day-label" class="stat__label">Last 24 hours</p>
+        <p
+          class="stat__value stat__value--secondary"
+          id="day-usage"
+          aria-live="polite"
+        >
+          —
+        </p>
+      </section>
+
+      <section class="limit" aria-labelledby="limit-label">
+        <div class="limit__head">
+          <span id="limit-label" class="limit__label">vs 10h daily limit</span>
+          <span class="limit__pct" id="limit-pct" aria-hidden="true"></span>
+        </div>
+        <div
+          class="limit__track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          aria-labelledby="limit-label"
+          id="limit-bar"
+        >
+          <div class="limit__fill" id="limit-fill"></div>
+        </div>
+      </section>
     </main>
     <script src="popup.js"></script>
   </body>
