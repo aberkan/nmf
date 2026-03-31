@@ -1,8 +1,9 @@
 const MS_DAY = 86400000;
 const MS_4H = 4 * 3600 * 1000;
 const MS_WEEK = 7 * MS_DAY;
-/** Matches planned Phase 4 enforcement (10h / 24h). */
-const DAILY_LIMIT_MS = 10 * 3600 * 1000;
+/** Matches enforcement thresholds. */
+const LIMIT_4H_MS = 1 * 3600 * 1000;
+const LIMIT_24H_MS = 4 * 3600 * 1000;
 
 /**
  * Human-readable duration: e.g. "4h 12m", "1d 2h 5m", "45s".
@@ -33,23 +34,34 @@ function formatDuration(ms) {
   return `${seconds}s`;
 }
 
-function formatLimitPercent(dayMs) {
-  if (!Number.isFinite(dayMs) || dayMs < 0) return "";
-  const pct = (dayMs / DAILY_LIMIT_MS) * 100;
-  return `${Math.round(pct)}%`;
+function formatLimitPercent(last4hMs, last24hMs) {
+  if (
+    !Number.isFinite(last4hMs) ||
+    !Number.isFinite(last24hMs) ||
+    last4hMs < 0 ||
+    last24hMs < 0
+  ) {
+    return "";
+  }
+  const pct4h = (last4hMs / LIMIT_4H_MS) * 100;
+  const pct24h = (last24hMs / LIMIT_24H_MS) * 100;
+  return `${Math.round(Math.max(pct4h, pct24h))}%`;
 }
 
-function updateLimitBar(dayMs) {
+function updateLimitBar(last4hMs, last24hMs) {
   const fill = document.getElementById("limit-fill");
   const bar = document.getElementById("limit-bar");
   const pctEl = document.getElementById("limit-pct");
   if (!fill || !bar || !pctEl) return;
 
-  const rawPct = Number.isFinite(dayMs) && dayMs >= 0 ? (dayMs / DAILY_LIMIT_MS) * 100 : 0;
+  const pct4h = Number.isFinite(last4hMs) && last4hMs >= 0 ? (last4hMs / LIMIT_4H_MS) * 100 : 0;
+  const pct24h =
+    Number.isFinite(last24hMs) && last24hMs >= 0 ? (last24hMs / LIMIT_24H_MS) * 100 : 0;
+  const rawPct = Math.max(pct4h, pct24h);
   const widthPct = Math.min(100, Math.max(0, rawPct));
   fill.style.width = `${widthPct}%`;
   fill.classList.toggle("limit__fill--over", rawPct > 100);
-  pctEl.textContent = formatLimitPercent(dayMs);
+  pctEl.textContent = formatLimitPercent(last4hMs, last24hMs);
   bar.setAttribute("aria-valuenow", String(Math.round(widthPct)));
 }
 
@@ -77,12 +89,12 @@ async function refresh() {
     weekEl.textContent = formatDuration(weekMs);
     lastDayEl.textContent = formatDuration(lastDayMs);
     dayEl.textContent = formatDuration(fourHourMs);
-    updateLimitBar(lastDayMs);
+    updateLimitBar(fourHourMs, lastDayMs);
   } catch {
     weekEl.textContent = "—";
     lastDayEl.textContent = "—";
     dayEl.textContent = "—";
-    updateLimitBar(0);
+    updateLimitBar(0, 0);
   }
 }
 

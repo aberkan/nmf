@@ -4,10 +4,12 @@ const PRUNE_MS = 8 * 24 * 60 * 60 * 1000;
 const CHECKPOINT_ALARM = "checkpoint";
 const CHECKPOINT_PERIOD_MIN = 1;
 
-/** Rolling calendar window for Phase 4 enforcement (implementation plan). */
+/** Rolling windows used by enforcement logic. */
+const MS_4H = 4 * 3600 * 1000;
 const MS_DAY = 86400000;
-/** Strict `>`: 10h 0m allowed; above 10h triggers tab close. */
-const DAILY_LIMIT_MS = 10 * 3600 * 1000;
+/** Strict `>` thresholds for Phase 4 enforcement. */
+const LIMIT_4H_MS = 1 * 3600 * 1000;
+const LIMIT_24H_MS = 4 * 3600 * 1000;
 
 /** @type {{ startMs: number, tabId: number } | null} */
 let activeSegment = null;
@@ -122,19 +124,26 @@ async function checkpoint() {
   await appendInterval(startMs, now);
   activeSegment = { startMs: now, tabId };
   await saveActiveOpenSegment();
-  await maybeEnforceDailyLimit();
+  await maybeEnforceUsageLimits();
 }
 
 /**
- * If the focused active tab is Facebook and rolling last-24h usage is *strictly*
- * over 10h, close that tab.
+ * If the focused active tab is Facebook and usage is *strictly* over either:
+ * - 1 hour in the last 4 hours, OR
+ * - 4 hours in the last 24 hours
+ * then close that tab.
  */
-async function maybeEnforceDailyLimit() {
+async function maybeEnforceUsageLimits() {
   const t = await getTrackableFacebookTab();
   if (!t) return;
   const now = Date.now();
-  const ms = await sumUsageMs(now - MS_DAY, now);
-  if (ms <= DAILY_LIMIT_MS) return;
+  const [last4hMs, last24hMs] = await Promise.all([
+    sumUsageMs(now - MS_4H, now),
+    sumUsageMs(now - MS_DAY, now),
+  ]);
+  const over4hLimit = last4hMs > LIMIT_4H_MS;
+  const over24hLimit = last24hMs > LIMIT_24H_MS;
+  if (!over4hLimit && !over24hLimit) return;
   try {
     await chrome.tabs.remove(t.tabId);
   } catch {
@@ -154,10 +163,10 @@ async function reconcileNow() {
         activeSegment = { startMs: now, tabId: target.tabId };
         await saveActiveOpenSegment();
       }
-      await maybeEnforceDailyLimit();
+      await maybeEnforceUsageLimits();
       return;
     }
-    await maybeEnforceDailyLimit();
+    await maybeEnforceUsageLimits();
     return;
   }
 
@@ -165,7 +174,7 @@ async function reconcileNow() {
     activeSegment = { startMs: now, tabId: target.tabId };
     await saveActiveOpenSegment();
   }
-  await maybeEnforceDailyLimit();
+  await maybeEnforceUsageLimits();
 }
 
 function scheduleReconcile() {
