@@ -4,6 +4,11 @@ const PRUNE_MS = 8 * 24 * 60 * 60 * 1000;
 const CHECKPOINT_ALARM = "checkpoint";
 const CHECKPOINT_PERIOD_MIN = 1;
 
+/** Rolling calendar window for Phase 4 enforcement (implementation plan). */
+const MS_DAY = 86400000;
+/** Strict `>`: 10h 0m allowed; above 10h triggers tab close. */
+const DAILY_LIMIT_MS = 10 * 3600 * 1000;
+
 /** @type {{ startMs: number, tabId: number } | null} */
 let activeSegment = null;
 
@@ -117,6 +122,24 @@ async function checkpoint() {
   await appendInterval(startMs, now);
   activeSegment = { startMs: now, tabId };
   await saveActiveOpenSegment();
+  await maybeEnforceDailyLimit();
+}
+
+/**
+ * If the focused active tab is Facebook and rolling last-24h usage is *strictly*
+ * over 10h, close that tab.
+ */
+async function maybeEnforceDailyLimit() {
+  const t = await getTrackableFacebookTab();
+  if (!t) return;
+  const now = Date.now();
+  const ms = await sumUsageMs(now - MS_DAY, now);
+  if (ms <= DAILY_LIMIT_MS) return;
+  try {
+    await chrome.tabs.remove(t.tabId);
+  } catch {
+    // Tab may already be closed or missing permission edge cases.
+  }
 }
 
 async function reconcileNow() {
@@ -131,8 +154,10 @@ async function reconcileNow() {
         activeSegment = { startMs: now, tabId: target.tabId };
         await saveActiveOpenSegment();
       }
+      await maybeEnforceDailyLimit();
       return;
     }
+    await maybeEnforceDailyLimit();
     return;
   }
 
@@ -140,6 +165,7 @@ async function reconcileNow() {
     activeSegment = { startMs: now, tabId: target.tabId };
     await saveActiveOpenSegment();
   }
+  await maybeEnforceDailyLimit();
 }
 
 function scheduleReconcile() {
