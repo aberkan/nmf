@@ -1,4 +1,5 @@
 const MS_DAY = 86400000;
+const MS_4H = 4 * 3600 * 1000;
 const MS_WEEK = 7 * MS_DAY;
 /** Matches planned Phase 4 enforcement (10h / 24h). */
 const DAILY_LIMIT_MS = 10 * 3600 * 1000;
@@ -62,20 +63,24 @@ async function getUsageSince(sinceMs) {
 
 async function refresh() {
   const weekEl = document.getElementById("week-usage");
+  const lastDayEl = document.getElementById("last-day-usage");
   const dayEl = document.getElementById("day-usage");
-  if (!weekEl || !dayEl) return;
+  if (!weekEl || !lastDayEl || !dayEl) return;
 
   try {
     const now = Date.now();
-    const [weekMs, dayMs] = await Promise.all([
+    const [weekMs, lastDayMs, fourHourMs] = await Promise.all([
       getUsageSince(now - MS_WEEK),
       getUsageSince(now - MS_DAY),
+      getUsageSince(now - MS_4H),
     ]);
     weekEl.textContent = formatDuration(weekMs);
-    dayEl.textContent = formatDuration(dayMs);
-    updateLimitBar(dayMs);
+    lastDayEl.textContent = formatDuration(lastDayMs);
+    dayEl.textContent = formatDuration(fourHourMs);
+    updateLimitBar(lastDayMs);
   } catch {
     weekEl.textContent = "—";
+    lastDayEl.textContent = "—";
     dayEl.textContent = "—";
     updateLimitBar(0);
   }
