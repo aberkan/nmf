@@ -4,6 +4,7 @@ const MS_WEEK = 7 * MS_DAY;
 /** Matches enforcement thresholds. */
 const LIMIT_4H_MS = 1 * 3600 * 1000;
 const LIMIT_24H_MS = 4 * 3600 * 1000;
+const ENFORCEMENT_DISABLED_KEY = "enforcementDisabled";
 
 /**
  * Human-readable duration: e.g. "4h 12m", "1d 2h 5m", "45s".
@@ -73,6 +74,21 @@ async function getUsageSince(sinceMs) {
   return typeof res?.ms === "number" ? res.ms : 0;
 }
 
+async function refreshOverrideUi() {
+  const btn = document.getElementById("override-btn");
+  const hint = document.getElementById("override-hint");
+  if (!btn || !hint) return;
+  const { [ENFORCEMENT_DISABLED_KEY]: disabled } = await chrome.storage.local.get(
+    ENFORCEMENT_DISABLED_KEY,
+  );
+  const off = disabled === true;
+  btn.textContent = off ? "Resume enforcement" : "Pause enforcement";
+  btn.setAttribute("aria-pressed", off ? "true" : "false");
+  hint.textContent = off
+    ? "Auto-close is off. Usage is still tracked."
+    : "Closes the active Facebook tab if limits are exceeded.";
+}
+
 async function refresh() {
   const weekEl = document.getElementById("week-usage");
   const lastDayEl = document.getElementById("last-day-usage");
@@ -96,6 +112,7 @@ async function refresh() {
     dayEl.textContent = "—";
     updateLimitBar(0, 0);
   }
+  await refreshOverrideUi();
 }
 
 let pollId = null;
@@ -121,6 +138,17 @@ document.addEventListener("visibilitychange", () => {
   } else {
     stopPolling();
   }
+});
+
+document.getElementById("override-btn")?.addEventListener("click", async () => {
+  const { [ENFORCEMENT_DISABLED_KEY]: disabled } = await chrome.storage.local.get(
+    ENFORCEMENT_DISABLED_KEY,
+  );
+  const currentlyOff = disabled === true;
+  await chrome.storage.local.set({
+    [ENFORCEMENT_DISABLED_KEY]: !currentlyOff,
+  });
+  await refreshOverrideUi();
 });
 
 void refresh();

@@ -1,5 +1,7 @@
 const STORAGE_KEY = "intervals";
 const ACTIVE_SEGMENT_KEY = "activeOpenSegment";
+/** When `true`, tab-close enforcement is off; tracking continues. */
+const ENFORCEMENT_DISABLED_KEY = "enforcementDisabled";
 const PRUNE_MS = 8 * 24 * 60 * 60 * 1000;
 const CHECKPOINT_ALARM = "checkpoint";
 const CHECKPOINT_PERIOD_MIN = 1;
@@ -137,10 +139,12 @@ async function maybeEnforceUsageLimits() {
   const t = await getTrackableFacebookTab();
   if (!t) return;
   const now = Date.now();
-  const [last4hMs, last24hMs] = await Promise.all([
+  const [settings, last4hMs, last24hMs] = await Promise.all([
+    chrome.storage.local.get(ENFORCEMENT_DISABLED_KEY),
     sumUsageMs(now - MS_4H, now),
     sumUsageMs(now - MS_DAY, now),
   ]);
+  if (settings[ENFORCEMENT_DISABLED_KEY] === true) return;
   const over4hLimit = last4hMs > LIMIT_4H_MS;
   const over24hLimit = last24hMs > LIMIT_24H_MS;
   if (!over4hLimit && !over24hLimit) return;
